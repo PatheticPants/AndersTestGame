@@ -17,11 +17,15 @@
      reserve, so the interesting decision is always "spend now or save". */
   var WEAPONS = [
     {
-      name: 'SIDEARM', ammo: 'bullets', use: 1, rate: 0.36, frames: Spr.weapon.pistol,
-      seq: [1, 2, 0], damage: [8, 16], spread: 0.022, pellets: 1, range: 40,
+      /* The sidearm never runs dry. You should always be able to shoot your way
+         back into the fight, because the fight is where clock comes from. */
+      name: 'SIDEARM', ammo: null, use: 0, rate: 0.34, frames: Spr.weapon.pistol,
+      seq: [1, 2, 0], damage: [9, 17], spread: 0.022, pellets: 1, range: 40,
       sound: 'pistol', flash: 5, kick: 2.2, slot: 0,
-      alt: { name: 'RAILSHOT', use: 6, rate: 0.80, damage: [40, 58], spread: 0, pellets: 1,
-             range: 48, pierce: 4, sound: 'plasma', flash: 10, kick: 7.5 }
+      /* Its secondary is paid for in clock instead of bullets — the only
+         resource that matters, and a real decision every time. */
+      alt: { name: 'RAILSHOT', use: 0, clockCost: 2.5, rate: 0.85, damage: [46, 64],
+             spread: 0, pellets: 1, range: 48, pierce: 4, sound: 'plasma', flash: 10, kick: 7.5 }
     },
     {
       name: 'SCATTERGUN', ammo: 'shells', use: 1, rate: 0.92, frames: Spr.weapon.shotgun,
@@ -1124,6 +1128,18 @@
     var p = this.player, base = WEAPONS[p.weapon];
     var w = isAlt && base.alt ? base.alt : base;
     var ammoKind = base.ammo;
+
+    /* clock-priced secondaries */
+    if (w.clockCost) {
+      if (p.clock < w.clockCost + 3) {
+        Sound.play('noammo', 0.8);
+        this.popup('NOT ENOUGH CLOCK', P.RED, P.RED_N);
+        p.weaponTimer = 0.35;
+        return;
+      }
+      p.clock -= w.clockCost;
+      this.popup('-' + w.clockCost.toFixed(1) + ' SEC', P.RED, P.RED_N);
+    }
 
     if (ammoKind && p.ammo[ammoKind] < w.use) {
       Sound.play('noammo', 0.8);

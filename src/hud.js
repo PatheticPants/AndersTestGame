@@ -192,14 +192,19 @@
     }
 
     /* ---- bottom right: weapon and ammo ---- */
-    var ammoTxt = base.ammo ? String(p.ammo[base.ammo]) : '--';
-    var lowAmmo = base.ammo && p.ammo[base.ammo] <= 5;
     r.shadeRect(W - 106, H - 46, 106, 46, 0.45);
-    drawBig(r, ammoTxt, W - 6, H - 34, lowAmmo ? P.RED : P.GOLD, lowAmmo ? P.RED_N : P.GOLD_N);
+    if (base.ammo) {
+      var lowAmmo = p.ammo[base.ammo] <= 5;
+      drawBig(r, String(p.ammo[base.ammo]), W - 6, H - 34, lowAmmo ? P.RED : P.GOLD,
+        lowAmmo ? P.RED_N : P.GOLD_N);
+    } else {
+      drawText(r, 'UNLIMITED', W - 6 - textWidth('UNLIMITED', 1), H - 28, sh(P.CYAN, P.CYAN_N, 0.72), 1);
+    }
     drawText(r, base.name, W - 6 - textWidth(base.name, 1), H - 8, sh(P.STONE, P.STONE_N, 0.80), 1);
     if (base.alt) {
-      var altTxt = 'RMB ' + base.alt.name;
-      var canAlt = !base.ammo || p.ammo[base.ammo] >= base.alt.use;
+      var altTxt = 'RMB ' + base.alt.name + (base.alt.clockCost ? '  -' + base.alt.clockCost.toFixed(1) + 'S' : '');
+      var canAlt = (!base.ammo || p.ammo[base.ammo] >= base.alt.use) &&
+                   (!base.alt.clockCost || p.clock >= base.alt.clockCost + 3);
       drawText(r, altTxt, W - 6 - textWidth(altTxt, 1), H - 16,
         canAlt ? sh(P.CYAN, P.CYAN_N, 0.74) : sh(P.GRAY, P.GRAY_N, 0.30), 1);
     }

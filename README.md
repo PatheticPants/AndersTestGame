@@ -71,9 +71,13 @@ out while the body arches, tears open across the middle and throws its top half
 clear in a spray of chunks. Time orbs drift back toward you out of the mess.
 **The seconds keeping you alive are inside the thing trying to kill you.**
 
-Every weapon also has a **secondary on right mouse**: a piercing railshot, a
-double blast that knocks *you* backwards hard enough to use as movement, a flak
-burst, a slow shock orb, and a cluster rocket that airbursts into bomblets.
+The **sidearm never runs dry** — you should always be able to shoot your way
+back into a fight, because the fight is where clock comes from. Its secondary,
+a piercing railshot, is priced in *seconds* rather than bullets.
+
+Every weapon has a **secondary on right mouse**: that railshot, a double blast
+that knocks *you* backwards hard enough to use as movement, a flak burst, a slow
+shock orb, and a cluster rocket that airbursts into bomblets.
 
 Sector one teaches all of this in-flow — one prompt at a time, each appearing
 the moment it becomes relevant and disappearing the instant you use it. There is
@@ -91,7 +95,7 @@ nothing to read before you start.
 | **`Space`** | **dash** |
 | **`F`** | **execute a staggered enemy** |
 | `E` | doors and switches |
-| `1`–`5` | sidearm, scattergun, autocannon, arc projector, siege launcher |
+| `1`–`5` | sidearm *(unlimited ammo)*, scattergun, autocannon, arc projector, siege launcher |
 | `Tab` | automap (`+` / `-` to zoom) |
 | `Esc` / `P` | pause |
 | `V` CRT filter · `M` music · `N` sound · `X` crosshair |
