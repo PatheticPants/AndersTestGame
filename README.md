@@ -4,8 +4,12 @@
 
 A pixelated first-person shooter where **time is your health bar**. Runs in a browser.
 
-**To play: open `index.html`.** No install, no build step, no server, no
-dependencies. Double-click the file.
+## ▶ [**CLICK HERE TO PLAY**](https://patheticpants.github.io/AndersTestGame/)
+
+No download, no install, no account. It runs in your browser.
+
+*(Or grab the code and open `index.html` by double-clicking it — no build step,
+no server, no dependencies.)*
 
 ---
 
