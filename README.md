@@ -60,9 +60,16 @@ the one that saves your life.
 Dashing *through* an attack in chrono is the best feeling here.
 
 **STAGGER AND EXECUTE** (`F`) — the first lethal hit does not kill. It drops the
-enemy to a knee, strobing, for four seconds. Close in and execute: the screen
-freezes for a beat, it bursts, and time orbs drift toward you. **The seconds
-keeping you alive are inside the thing trying to kill you.**
+enemy to a knee for four seconds, breathing with a slow ember pulse. Get close
+enough to actually reach it and that pulse tightens into a hard bright throb —
+the glow tells you not just *"this one is wounded"* but *"you can do it right
+now"*.
+
+Hit `F` and the game takes over for a beat: the camera snaps onto the kill, the
+lens punches in, everything **freezes**, and then a sliver of slow motion runs
+out while the body arches, tears open across the middle and throws its top half
+clear in a spray of chunks. Time orbs drift back toward you out of the mess.
+**The seconds keeping you alive are inside the thing trying to kill you.**
 
 Every weapon also has a **secondary on right mouse**: a piercing railshot, a
 double blast that knocks *you* backwards hard enough to use as movement, a flak
@@ -116,6 +123,12 @@ Three sectors, ending in the Core.
   which is what makes a gun read as *held* rather than as scenery
 - Enemies drawn in three views and mirrored at render time, giving eight
   rotations — they visibly turn as they circle you
+- A dedicated six-frame execution sequence per enemy, tinted to its own palette
+  ramp: the tear accelerates rather than moving linearly, and the upper half
+  tumbles as it goes, so it reads as violence rather than a fade-out
+- Sprite glow is continuous rather than a switch, easing toward fullbright and
+  shifting the palette hot only at the top of the pulse — a strobe reads as a
+  bug, a breath reads as intent
 - Two skies: a freezing star-field with an aurora for the surface sectors, and
   hellfire for the Core
 

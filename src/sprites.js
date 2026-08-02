@@ -384,6 +384,101 @@
   }
 
   /* ==========================================================================
+   * Execution sequence.
+   *
+   * Deliberately not the ordinary death: the body arches, tears open across the
+   * middle, and the top half is thrown clear before the whole thing comes apart.
+   * Six frames at 16fps, so it reads in about a third of a second.
+   * ========================================================================== */
+  function executeFrames(size, rs, rn, count, seed) {
+    var out = [], r = rng(seed);
+    for (var f = 0; f < count; f++) {
+      var b = new PixBuf(size, size);
+      var cx = size / 2, gy = size - 2;
+      var t = count === 1 ? 0 : f / (count - 1);
+      var tear = Math.max(0, (t - 0.14) / 0.86);     /* held for one frame, then rips */
+      var lift = tear * tear * 46;                   /* accelerating, not linear */
+      var drift = tear * 17;
+      var last = f === count - 1;
+
+      if (!last) {
+        /* lower half buckling under the weight it no longer carries */
+        var hipY = gy - 21 + tear * 15;
+        var spread = 5 + tear * 11;
+        limb(b, cx - 4, hipY, cx - spread, gy - 2, 4.2 - tear, rs, rn, 0.20);
+        limb(b, cx + 4, hipY, cx + spread, gy - 2, 4.2 - tear, rs, rn, 0.26);
+        blob(b, cx, hipY - 3 + tear * 6, 10 - tear * 2, 8 - tear * 3, rs, rn, 0.28);
+
+        /* ragged tear across the middle, opening up as it goes */
+        if (tear > 0.02) {
+          var ty = hipY - 11 + tear * 5;
+          for (var x = -11; x <= 11; x++) {
+            var jag = ((x * 7 + f * 13) % 5) - 2;
+            for (var k = 0; k < 1 + tear * 4; k++)
+              b.px(cx + x, ty + jag - k, sh(P.BLOOD, P.BLOOD_N, 0.55 - k * 0.08));
+          }
+        }
+
+        /* upper half torn free, thrown up and back, tumbling as it goes */
+        if (t < 0.86) {
+          var s = 1 - tear * 0.20;
+          var ux = cx - drift, uy = hipY - 19 - lift;
+          var roll = tear * 7;                       /* head swings round */
+          blob(b, ux, uy, 10 * s, 9 * s, rs, rn, 0.32);
+          blob(b, ux - roll, uy - 11 * s + roll * 0.5, 6.5 * s, 6 * s, rs, rn, 0.38);
+          limb(b, ux - 8 * s, uy - 2, ux - 18 * s - tear * 12, uy - 4 + tear * 12, 3, rs, rn, 0.26);
+          limb(b, ux + 8 * s, uy - 2, ux + 18 * s + tear * 12, uy - 10 - tear * 10, 3, rs, rn, 0.30);
+          /* spine and viscera trailing out of the torn torso */
+          if (tear > 0.08) {
+            for (var v = 0; v < 7; v++)
+              b.px(ux + v * roll * 0.3, uy + 10 * s + v * 2.4, sh(P.STONE, P.STONE_N, 0.58 - v * 0.06));
+            for (var w = 0; w < 5; w++)
+              b.ellipse(ux + (r() - 0.5) * 9, uy + 11 * s + w * 3, 1.6, 1.3,
+                sh(P.BLOOD, P.BLOOD_N, 0.30 + r() * 0.3));
+          }
+        }
+
+        /* spray, widening and thickening as it comes apart */
+        var n = 30 + f * 34;
+        for (var i = 0; i < n; i++) {
+          var a = -Math.PI / 2 + (r() - 0.5) * (1.1 + tear * 3.6);
+          var d = r() * (8 + tear * 40);
+          var px = cx + Math.cos(a) * d * (0.6 + r() * 0.9);
+          var py = hipY - 9 + Math.sin(a) * d * 0.75 + tear * 10;
+          if (r() < 0.30 * tear) b.ellipse(px, py, 1.4, 1.2, sh(P.BLOOD, P.BLOOD_N, 0.30 + r() * 0.45));
+          else b.px(px, py, sh(P.BLOOD, P.BLOOD_N, 0.18 + r() * 0.55));
+        }
+      } else {
+        /* nothing left but a wet pile */
+        b.ellipse(cx, gy - 3, 20, 5, sh(P.BLOOD, P.BLOOD_N, 0.16));
+        b.ellipse(cx - 4, gy - 5, 13, 4, sh(rs, rn, 0.20));
+        b.ellipse(cx + 8, gy - 4, 7, 3, sh(rs, rn, 0.26));
+        blob(b, cx - 11, gy - 6, 5, 4, rs, rn, 0.28);
+        for (var j = 0; j < 90; j++)
+          b.px(cx + (r() - 0.5) * 46, gy - r() * 11, sh(P.BLOOD, P.BLOOD_N, 0.12 + r() * 0.48));
+      }
+
+      /* the hit itself: a hard white core on the first frame only */
+      if (f === 0) {
+        b.ellipse(cx, gy - 30, 10, 8, sh(P.CYAN, P.CYAN_N, 0.85));
+        b.ellipse(cx, gy - 30, 5, 4, 247);
+      }
+      out.push(finish(b));
+    }
+    return out;
+  }
+
+  /* Chunks thrown clear by an execution. */
+  function gibSpr(k) {
+    var b = new PixBuf(8, 8), r = rng(760 + k);
+    var w = 1.8 + (k % 3) * 0.9;
+    b.ellipseShaded(4, 4, w, w * 0.85, P.FLESH, P.FLESH_N, 0.10, 0.55);
+    for (var i = 0; i < 5; i++)
+      b.px(2 + r() * 4, 2 + r() * 4, sh(P.BLOOD, P.BLOOD_N, 0.25 + r() * 0.5));
+    return finish(b);
+  }
+
+  /* ==========================================================================
    * Items and scenery
    * ========================================================================== */
   function itemBase(b, w, cx, gy, rs, rn) {
@@ -981,7 +1076,11 @@
    * Build everything
    * ========================================================================== */
   function creature(fn, size, rampS, rampN, deaths, seed) {
-    var set = { walk: [], attack: [], pain: [], die: deathFrames(size, rampS, rampN, deaths, seed), size: size };
+    var set = {
+      walk: [], attack: [], pain: [], size: size,
+      die: deathFrames(size, rampS, rampN, deaths, seed),
+      exec: executeFrames(size, rampS, rampN, 6, seed + 5)
+    };
     for (var f = 0; f < 4; f++) set.walk.push([fn(FRONT, 'walk', f), fn(SIDE, 'walk', f), fn(BACK, 'walk', f)]);
     for (var a = 0; a < 2; a++) set.attack.push([fn(FRONT, 'attack', a), fn(SIDE, 'attack', a), fn(BACK, 'attack', a)]);
     set.pain.push([fn(FRONT, 'pain', 0), fn(SIDE, 'pain', 0), fn(BACK, 'pain', 0)]);
@@ -1030,6 +1129,7 @@
       execute: []
     },
     orb: { health: [], chrono: [] },
+    gib: [],
     weapon: {},
     faces: {},
     FRONT: FRONT, SIDE: SIDE, BACK: BACK
@@ -1037,6 +1137,7 @@
 
   for (var e = 0; e < 7; e++) Spr.fx.explosion.push(explosion(e, 7));
   for (var xb = 0; xb < 6; xb++) Spr.fx.execute.push(executeBurst(xb, 6));
+  for (var gb = 0; gb < 5; gb++) Spr.gib.push(gibSpr(gb));
   for (var ob = 0; ob < 4; ob++) {
     Spr.orb.health.push(orbSpr(ob, P.RED, P.RED_N));
     Spr.orb.chrono.push(orbSpr(ob, P.CYAN, P.CYAN_N));

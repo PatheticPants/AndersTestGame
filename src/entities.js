@@ -227,12 +227,13 @@
   }
 
   function kill(game, e, overkill, executed) {
-    e.state = 'die';
+    e.state = executed ? 'exec' : 'die';
     e.stateTime = 0;
     e.deathFrame = 0;
     e.solid = false;
     e.threat = false;
-    e.bright = false;
+    e.bright = !!executed;
+    e.glow = 0;
     e.vulnerable = false;
     e.gibbed = executed || overkill >= e.def.gib;
     game.sound('death', e.x, e.y, 0.9, e.def.pitch);
@@ -249,15 +250,52 @@
      source of health and chrono — so the game pushes you forward, not back. */
   function execute(game, e) {
     var bonus = Math.round(e.def.score * 0.75);
-    spawnFX(game, e.x, e.y, 0.45, Spr.fx.execute, 24, 1.7, true);
+    var away = Math.atan2(e.y - game.player.y, e.x - game.player.x);
+    var boss = !!e.def.boss;
+
+    spawnFX(game, e.x, e.y, 0.30, Spr.fx.execute, 30, 0.78, true);
     kill(game, e, 9999, true);
     game.player.score += bonus;
-    var n = e.def.boss ? 6 : 3;
+
+    var n = boss ? 6 : 3;
     for (var i = 0; i < n; i++) spawnOrb(game, e.x, e.y, i % 3 === 2 ? 'chrono' : 'health');
+
+    /* chunks thrown mostly away from you, so the camera sees them fly */
+    var gn = boss ? 30 : 20;
+    for (var g = 0; g < gn; g++) {
+      var a = away + (Math.random() - 0.5) * 2.3;
+      var sp = 1.1 + Math.random() * 3.6;
+      spawnGib(game, e.x, e.y, 0.35 + Math.random() * 0.55,
+        Math.cos(a) * sp, Math.sin(a) * sp, 1.6 + Math.random() * 3.6);
+    }
+
     game.sound('execute', e.x, e.y, 1.0);
-    game.hitStop = Math.max(game.hitStop, 0.11);
-    game.shake(0.5);
+    game.onExecuteCamera(e);
     return bonus;
+  }
+
+  function spawnGib(game, x, y, z, vx, vy, vz) {
+    return push(game, {
+      kind: 'gib', x: x, y: y, z: z, h: 0.18,
+      vx: vx, vy: vy, vz: vz, life: 2.4 + Math.random() * 1.6,
+      pic: Spr.gib[(Math.random() * Spr.gib.length) | 0], radius: 0
+    });
+  }
+
+  function updateGib(game, e, dt) {
+    e.life -= dt;
+    if (e.life <= 0) { e.remove = true; return; }
+    e.vz -= 9.4 * dt;
+    var nx = e.x + e.vx * dt, ny = e.y + e.vy * dt;
+    if (!game.solidAt(nx, e.y)) e.x = nx; else e.vx = -e.vx * 0.35;
+    if (!game.solidAt(e.x, ny)) e.y = ny; else e.vy = -e.vy * 0.35;
+    e.z += e.vz * dt;
+    if (e.z <= 0.03) {                            /* skid to a halt on the floor */
+      e.z = 0.03;
+      e.vz = -e.vz * 0.30;
+      e.vx *= 0.55; e.vy *= 0.55;
+      if (Math.abs(e.vz) < 0.45) { e.vz = 0; e.vx *= 0.2; e.vy *= 0.2; }
+    }
   }
 
   function spawnOrb(game, x, y, type) {
@@ -324,6 +362,7 @@
         case 'fx': updateFX(game, e, dt); break;
         case 'item': updateItem(game, e, dt); break;
         case 'orb': updateOrb(game, e, dt); break;
+        case 'gib': updateGib(game, e, dt); break;
         case 'timer':
           e.fuse -= dt;
           if (e.fuse <= 0) { e.remove = true; explode(game, e.x, e.y, e.blastR, e.blastD, e.owner); }
@@ -490,8 +529,38 @@
 
     if (e.state === 'stagger') {
       e.pic = pick(d.sprites.pain[0], e, game);
-      e.bright = ((e.stateTime * 11) | 0) % 2 === 0;      /* strobes so it is obvious */
-      if (e.stateTime > 4.2) { e.bright = false; kill(game, e, 0); }
+      /* A slow ember pulse from across the room, tightening to a hard strobe
+         once you are close enough and facing it — so the glow tells you not
+         just "this one is wounded" but "you can do it right now". */
+      var ready = game.canExecute(e);
+      var rate = ready ? 10 : 4.2;
+      /* Kept deliberately shy of full brightness: the point is a pulse you
+         notice, not a whiteout that erases the thing you are aiming at. */
+      var lo = ready ? 0.26 : 0.05, hi = ready ? 0.72 : 0.26;
+      var wave = 0.5 + 0.5 * Math.sin(e.stateTime * rate);
+      e.glow = lo + (hi - lo) * wave * wave;
+      e.bright = false;
+      /* fading out as the window closes */
+      var left = 4.2 - e.stateTime;
+      if (left < 1.0) e.glow *= Math.max(0.15, left);
+      if (e.stateTime > 4.2) { e.glow = 0; kill(game, e, 0); }
+      return;
+    }
+
+    if (e.state === 'exec') {
+      var ex = d.sprites.exec;
+      var xi = Math.floor(e.stateTime * 16);
+      if (xi >= ex.length) {
+        e.glow = 0; e.bright = false;
+        spawnCorpse(game, e.x, e.y, ex[ex.length - 1], d.height * 0.5);
+        e.state = 'dead';
+        e.remove = true;
+        return;
+      }
+      e.pic = ex[xi];
+      e.mirror = false;
+      e.bright = xi < 1;                       /* only the contact frame blows out */
+      e.glow = xi < 4 ? 0.62 - xi * 0.15 : 0;
       return;
     }
 
@@ -652,7 +721,7 @@
   global.Ent = {
     ENEMIES: ENEMIES, ITEMS: ITEMS, DECOR: DECOR, PROJECTILES: PROJECTILES,
     spawn: spawn, spawnProjectile: spawnProjectile, spawnFX: spawnFX,
-    spawnOrb: spawnOrb, execute: execute,
+    spawnOrb: spawnOrb, spawnGib: spawnGib, execute: execute,
     update: update, hurt: hurt, explode: explode, norm: norm
   };
 })(window);

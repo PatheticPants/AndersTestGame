@@ -305,9 +305,15 @@
       else {
         light = ambient + depth * fog + (sp.lightAdd || 0);
         if (cam.flash > 0) light -= cam.flash * Math.max(0, 1 - depth / 7);
+        /* `glow` is continuous, not a switch: it eases the sprite toward
+           fullbright so a staggered enemy can breathe rather than strobe. */
+        if (sp.glow > 0) light -= light * sp.glow;
         if (light < 0) light = 0; else if (light > LL - 1) light = LL - 1;
       }
       var cmapOff = (light | 0) * 256;
+      /* past the halfway point the palette itself shifts hot, which is what
+         sells it as emissive rather than merely lit */
+      var hot = sp.glow > 0.60;
       var pw = pic.w, ph = pic.h, pd = pic.d;
       var stepY = ph / sh, stepX = pw / sw;
       var mirror = sp.mirror;
@@ -323,7 +329,7 @@
           var vi = v | 0;
           if (vi >= ph) vi = ph - 1;
           var c = pd[vi * pw + u];
-          if (c !== 0) buf[p] = PAL32[CMAP[cmapOff + c]];
+          if (c !== 0) buf[p] = PAL32[CMAP[cmapOff + (hot ? BRIGHT[c] : c)]];
           v += stepY;
           p += W;
         }

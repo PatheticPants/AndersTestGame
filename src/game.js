@@ -239,6 +239,8 @@
     this.popups = [];
     this.chronoActive = false;
     this.hitStop = 0;
+    this.execSlow = 0;
+    this.execPunch = 0;
     this.timeScale = 1;
     this.pickupFlash = 0;
     this.hitMarker = 0;
@@ -746,18 +748,40 @@
     Ent.spawnFX(this, p.x, p.y, 0.5, Spr.fx.zap, 26, 0.75);
   };
 
+  var EXEC_RANGE = 2.6, EXEC_CONE = 1.25;
+
+  /* Is this specific body in reach right now? Drives both the F key and the
+     brightness of the pulse, so what you see is exactly what you can do. */
+  Game.canExecute = function (e) {
+    if (!e || e.kind !== 'enemy' || e.state !== 'stagger') return false;
+    var p = this.player;
+    if (p.dead) return false;
+    var dx = e.x - p.x, dy = e.y - p.y;
+    var d = Math.sqrt(dx * dx + dy * dy);
+    if (d > EXEC_RANGE) return false;
+    return Math.abs(Ent.norm(Math.atan2(dy, dx) - p.angle)) <= EXEC_CONE;
+  };
+
   Game.nearestStagger = function () {
-    var p = this.player, best = null, bestD = 2.6;
+    var best = null, bestD = EXEC_RANGE + 1;
     for (var i = 0; i < this.entities.length; i++) {
       var e = this.entities[i];
-      if (e.kind !== 'enemy' || e.state !== 'stagger') continue;
-      var dx = e.x - p.x, dy = e.y - p.y;
-      var d = Math.sqrt(dx * dx + dy * dy);
-      if (d > bestD) continue;
-      if (Math.abs(Ent.norm(Math.atan2(dy, dx) - p.angle)) > 1.25) continue;
-      best = e; bestD = d;
+      if (!this.canExecute(e)) continue;
+      var d = Math.hypot(e.x - this.player.x, e.y - this.player.y);
+      if (d < bestD) { best = e; bestD = d; }
     }
     return best;
+  };
+
+  /* The payoff camera: snap onto the kill, punch the lens, freeze, then let a
+     sliver of slow motion run out before normal speed resumes. */
+  Game.onExecuteCamera = function (e) {
+    var p = this.player;
+    p.aimLock = { angle: Math.atan2(e.y - p.y, e.x - p.x), t: 0.26 };
+    this.hitStop = Math.max(this.hitStop, 0.15);
+    this.execSlow = 0.40;
+    this.execPunch = 1;
+    this.shake(0.65);
   };
 
   Game.tryExecute = function () {
@@ -913,6 +937,12 @@
     var maxPitch = this.renderer.viewH * 0.42;
     p.pitch = Math.max(-maxPitch, Math.min(maxPitch, p.pitch));
     if (!keys['ArrowUp'] && !keys['ArrowDown']) p.pitch *= Math.pow(0.02, dt);   /* eases back to level */
+
+    /* Executions briefly take the camera so the kill lands centre-frame. */
+    if (p.aimLock && p.aimLock.t > 0) {
+      p.aimLock.t -= dt;
+      p.angle += Ent.norm(p.aimLock.angle - p.angle) * Math.min(1, dt * 18);
+    }
 
     p.pitchKick += (0 - p.pitchKick) * Math.min(1, dt * 11);
 
@@ -1194,10 +1224,13 @@
     /* Two clocks. The world runs on `worldDt`, you run on `playerDt`, and a
        brief hit stop freezes both so executions land with weight. */
     if (this.hitStop > 0) this.hitStop -= raw;
+    this.execSlow = Math.max(0, (this.execSlow || 0) - raw);
+    this.execPunch = Math.max(0, (this.execPunch || 0) - raw * 2.6);
     var frozen = this.hitStop > 0;
-    this.timeScale = frozen ? 0 : (this.chronoActive ? 0.26 : 1);
+    var slow = this.chronoActive ? 0.26 : (this.execSlow > 0 ? 0.38 : 1);
+    this.timeScale = frozen ? 0 : slow;
     var worldDt = raw * this.timeScale;
-    var playerDt = frozen ? 0 : raw * (this.chronoActive ? 0.74 : 1);
+    var playerDt = frozen ? 0 : raw * (this.chronoActive ? 0.74 : (this.execSlow > 0 ? 0.8 : 1));
     var weaponDt = frozen ? 0 : raw * (this.chronoActive ? 0.88 : 1);
 
     this.stats.time += raw;
@@ -1213,7 +1246,8 @@
     this.cam.pitch = p.pitch + p.pitchKick + (Math.random() - 0.5) * this.shakeAmt * 6;
     this.cam.z = 0.55 + Math.sin(p.bobTime * 2) * 0.019;
     /* dash and chrono both widen the lens a touch — cheap, and it reads as speed */
-    this.cam.fov = 0.66 + (p.dashTime > 0 ? 0.085 : 0) + this.chronoFlash * 0.03;
+    this.cam.fov = 0.66 + (p.dashTime > 0 ? 0.085 : 0) + this.chronoFlash * 0.03
+      - (this.execPunch || 0) * 0.055;
   };
 
   Game.updateTitleCam = function (dt) {
@@ -1262,6 +1296,7 @@
       }
       if (this.chronoActive) r.tint(20, 140, 175, 0.14, 0, r.viewH);
       if (this.timeFlash > 0) r.tint(60, 220, 235, this.timeFlash * 0.16, 0, r.viewH);
+      if (this.execPunch > 0) r.tint(220, 245, 255, this.execPunch * 0.22, 0, r.viewH);
       if (p.painFlash > 0) r.tint(190, 20, 10, Math.min(0.62, p.painFlash * 0.55), 0, r.viewH);
       if (this.pickupFlash > 0) r.tint(220, 190, 60, this.pickupFlash * 0.22, 0, r.viewH);
       if (p.dead) r.tint(120, 0, 0, Math.min(0.55, p.deadTime * 0.35), 0, r.viewH);
