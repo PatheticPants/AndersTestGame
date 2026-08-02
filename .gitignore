@@ -1,0 +1,10 @@
+# local editor / OS noise
+.DS_Store
+Thumbs.db
+*.log
+
+# Claude Code local settings (not part of the game)
+.claude/settings.local.json
+
+# Claude Code local config (not part of the game)
+.claude/
