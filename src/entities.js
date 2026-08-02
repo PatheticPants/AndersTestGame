@@ -189,7 +189,7 @@
       if (e.hp <= 0) { e.dying = true; e.fuse = 0.06; }
       return;
     }
-    if (e.kind !== 'enemy' || e.state === 'die' || e.state === 'dead') return;
+    if (e.kind !== 'enemy' || e.state === 'die' || e.state === 'dead' || e.state === 'exec') return;
 
     /* Every point of damage you land is worth clock. This is what keeps the
        loop alive in rooms where kills are rare — a long fight with a Baron
@@ -436,7 +436,7 @@
       for (var i = 0; i < game.entities.length; i++) {
         var o = game.entities[i];
         if (o === e || o === e.owner) continue;
-        if (!(o.kind === 'enemy' && o.state !== 'die' && o.state !== 'dead') &&
+        if (!(o.kind === 'enemy' && o.state !== 'die' && o.state !== 'dead' && o.state !== 'exec') &&
             !(o.kind === 'decor' && o.explosive)) continue;
         var dx = o.x - e.x, dy = o.y - e.y;
         var rr = o.radius + e.radius;

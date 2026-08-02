@@ -31,16 +31,17 @@ Most shooters give you a health bar and scatter medkits around the floor, which
 quietly teaches you to play slowly: back off, heal up, peek a corner. This one
 deletes the health bar and replaces it with **a countdown**.
 
-The clock starts around 100 seconds and falls the whole time you are alive.
-Nothing you do stops it. What you *can* do is wind it back up:
+The clock starts at 55 seconds and burns a clean second per second, the whole
+time you are alive. Nothing you do stops it. What you *can* do is wind it back
+up:
 
 | | |
 |---|---|
-| land damage | **+0.03s per point** — a continuous drip, so a long fight pays you the whole way through |
-| kill | **+3s** |
-| execute a staggered enemy | **+9s** |
-| time cells and orbs | **+3s to +18s** |
-| keycards and secrets | **+8s / +12s** |
+| land damage | **+0.012s per point** — a continuous drip, so a long fight pays you the whole way through |
+| kill | **+2.5s** |
+| execute a staggered enemy | **+6s** |
+| clear a sealed room | **+4s** |
+| time cells and orbs | **+2s to +8s** |
 
 And every one of those is multiplied by your **kill chain**, up to 2x.
 
@@ -48,6 +49,25 @@ The result is a shooter where retreating is a losing move and hesitation is
 literally fatal — but where a good fight leaves you *better off than you
 started*. Watching the number climb back up while a room burns is the entire
 game.
+
+## The shape of a level
+
+Early versions were Doom-shaped: big maps, keycards, a switch hunt. That fights
+the clock directly. Wandering lost is the one thing a countdown cannot forgive,
+and enemies spread thin across a wide map means you can never earn enough time
+back to stay alive. Both problems have the same root — the level was asking you
+to slow down while the design was punishing you for it.
+
+So the campaign is a **gauntlet**. Every sector is a straight line of arenas
+joined by short halls. Walk in, the blast door ahead seals, a counter tells you
+how many are left, and it opens the moment the room is dead — which is also the
+moment your clock is fullest, so level pacing and resource pacing line up
+instead of fighting.
+
+Levels are declared as rectangles in `src/levels.js` rather than hand-typed
+ASCII, so geometry is guaranteed valid and the layout you read is the layout you
+walk. Gates are three tiles wide: threading a half-unit gap under fire is
+friction, not difficulty.
 
 ## The three tools
 
@@ -100,8 +120,9 @@ nothing to read before you start.
 | `Esc` / `P` | pause |
 | `V` CRT filter · `M` music · `N` sound · `X` crosshair |
 
-Find keycards to open the coloured doors. Find the switch to leave.
-Three sectors, ending in the Core.
+Three sectors, ending in the Core. No keys, no maze, no backtracking — walk
+into a room and the blast door on the far side seals until everything in there
+is dead. A run is about three minutes.
 
 ## What's in the engine
 

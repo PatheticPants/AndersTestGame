@@ -170,7 +170,7 @@
     drawBig(r, clockTxt, (W >> 1) + cw2 / 2, H - 38, cRamp, cRampN);
     drawTextCentre(r, 'SECONDS', W / 2, H - 16, sh(cRamp, cRampN, 0.45 + beat * 0.25), 1);
     var bw = 104;
-    meter(r, (W - bw) >> 1, H - 7, bw, 3, Math.min(1, p.clock / 90), cRamp, cRampN, 6);
+    meter(r, (W - bw) >> 1, H - 7, bw, 3, Math.min(1, p.clock / 70), cRamp, cRampN, 6);
 
     /* time just gained flashes above the clock */
     if (game.timeFlash > 0)
@@ -240,6 +240,15 @@
       r.blit(KEYICON[k], kx, 5, 0, 1, true);
     });
 
+    /* ---- arena lockdown: the counter is the whole motivation ---- */
+    var gt = game.activeGate && game.activeGate();
+    if (gt) {
+      var pulse = 0.66 + Math.sin(game.stateTime * 5) * 0.22;
+      var lbl = gt.live === 1 ? 'ROOM SEALED - 1 LEFT' : 'ROOM SEALED - ' + gt.live + ' LEFT';
+      r.shadeRect((W - 132) >> 1, 44, 132, 12, 0.5);
+      drawTextCentre(r, lbl, W / 2, 46, sh(P.RED, P.RED_N, pulse), 1);
+    }
+
     /* ---- execution prompt ---- */
     if (game.nearestStagger && game.nearestStagger()) {
       var f = 0.60 + Math.sin(game.stateTime * 12) * 0.34;
@@ -249,7 +258,7 @@
 
     if (game.tutorialText) {
       var tf = 0.62 + Math.sin(game.stateTime * 5) * 0.22;
-      drawTextCentre(r, game.tutorialText, W / 2, (H >> 1) - 44, sh(P.GOLD, P.GOLD_N, tf), 1);
+      drawTextCentre(r, game.tutorialText, W / 2, (H >> 1) - 28, sh(P.GOLD, P.GOLD_N, tf), 1);
     }
   }
 

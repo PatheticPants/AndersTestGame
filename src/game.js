@@ -58,9 +58,9 @@
   ];
 
   var DIFFS = [
-    { name: 'RECRUIT', blurb: 'GENEROUS CLOCK', dmgTaken: 0.5, enemyRate: 1.45, ammoMul: 2, clock: 120 },
-    { name: 'OPERATIVE', blurb: 'THE INTENDED RUN', dmgTaken: 1.0, enemyRate: 1.0, ammoMul: 1, clock: 100 },
-    { name: 'OVERCLOCKED', blurb: 'NO SLACK AT ALL', dmgTaken: 1.6, enemyRate: 0.68, ammoMul: 1, clock: 80 }
+    { name: 'RECRUIT', blurb: 'GENEROUS CLOCK', dmgTaken: 0.5, enemyRate: 1.45, ammoMul: 2, clock: 70 },
+    { name: 'OPERATIVE', blurb: 'THE INTENDED RUN', dmgTaken: 1.0, enemyRate: 1.0, ammoMul: 1, clock: 55 },
+    { name: 'OVERCLOCKED', blurb: 'NO SLACK AT ALL', dmgTaken: 1.6, enemyRate: 0.68, ammoMul: 1, clock: 42 }
   ];
 
   /* Chain kills to climb the ladder. Rank scales damage and chrono regen, and
@@ -94,6 +94,7 @@
       dstate: new Uint8Array(n), dtimer: new Float32Array(n),
       dkey: new Array(n), dsecret: new Uint8Array(n),
       seen: new Uint8Array(n), doors: [],
+      dgate: new Int8Array(n).fill(-1),
       sky: Tex.skies[def.skyIndex || 0]
     };
 
@@ -122,6 +123,7 @@
             var lw = !Levels.FLOORS[glyph(x - 1, y)], rw = !Levels.FLOORS[glyph(x + 1, y)];
             world.daxis[i] = (lw && rw) ? 1 : 0;
             world.dkey[i] = wl.key || null;
+            if (wl.gate) world.dgate[i] = -2;      /* resolved to an index below */
             world.dsecret[i] = wl.secret ? 1 : 0;
             world.doors.push(i);
             /* borrow floor/ceiling from a neighbour so standing in the doorway looks right */
@@ -136,6 +138,14 @@
         }
       }
     }
+
+    /* Bind each declared gate to its door tile and its arena rectangle. */
+    world.gates = (def.gates || []).map(function (gt, idx) {
+      var tiles = (gt.tiles || [gt.at]).map(function (t) { return t[1] * w + t[0]; });
+      tiles.forEach(function (i) { world.dgate[i] = idx; });
+      return { tiles: tiles, tile: tiles[0], zone: gt.zone, armed: false, cleared: false, live: 0 };
+    });
+    world.exitNeedsBoss = !!def.exitNeedsBoss;
     return world;
   }
 
@@ -188,8 +198,8 @@
    * hangs off that one rule: you cannot camp, you cannot back off to heal, and
    * slowing time costs you the very thing keeping you alive.
    * ========================================================================== */
-  var CLOCK_CAP = 150;                    /* hard ceiling so you cannot bank forever */
-  var CLOCK_DRAIN = 0.65;                 /* clock seconds burned per real second */
+  var CLOCK_CAP = 99;                    /* hard ceiling so you cannot bank forever */
+  var CLOCK_DRAIN = 1.0;                 /* clock seconds burned per real second */
   var DMG_TO_SECONDS = 0.12;              /* a 25 damage fireball costs 3s */
   var MAX_HIT_SECONDS = 4.0;              /* no single hit may gut a whole run */
   var HIT_IFRAMES = 0.45;                 /* stops a swarm from chain-melting you */
@@ -200,15 +210,20 @@
   /* Tuned against a bot that aims and shoots but never explores: it has to be
      able to break even on kills alone, because that is the promise the game
      makes on the title screen. */
+  /* Retuned for the gauntlet. The old numbers were set against sparse maps
+     where enemies were hard to find; packed arenas pay far more often, so a
+     full clear should net a modest surplus rather than pin the ceiling. A
+     clean second per second of drain also just reads honestly on the HUD. */
   var TIME = {
-    perDamage: 0.028,                     /* landing 100 damage buys ~2.8 seconds */
-    kill: 3.0,
-    execute: 9.0,
-    orb: 3.0,
-    small: 8.0,
-    large: 18.0,
-    key: 8.0,
-    secret: 12.0
+    perDamage: 0.012,                     /* landing 100 damage buys ~1.2 seconds */
+    kill: 2.5,
+    execute: 6.0,
+    orb: 2.0,
+    small: 5.0,
+    large: 8.0,
+    key: 6.0,
+    secret: 8.0,
+    roomClear: 4.0
   };
 
   function newPlayer(startClock) {
@@ -256,7 +271,7 @@
     if (prev) {
       /* Carry the clock forward, but top it up so a sector never opens on a
          death sentence. Finishing fast is rewarded, not punished. */
-      this.player.clock = Math.min(CLOCK_CAP, Math.max(prev.clock + 25, DIFFS[this.difficulty].clock * 0.8));
+      this.player.clock = Math.min(CLOCK_CAP, Math.max(prev.clock + 18, DIFFS[this.difficulty].clock));
       this.player.shield = prev.shield;
       this.player.shieldAbs = prev.shieldAbs;
       this.player.ammo = prev.ammo;
@@ -280,10 +295,18 @@
 
     var self = this;
     var totalKills = 0, totalItems = 0;
+    var gates = this.world.gates;
     this.level.things.forEach(function (t) {
       var e = Ent.spawn(self, t[0] + 0.5, t[1] + 0.5, t[2]);
       if (!e) return;
-      if (e.kind === 'enemy') totalKills++;
+      if (e.kind === 'enemy') {
+        totalKills++;
+        /* which arena is this one holding shut? */
+        for (var q = 0; q < gates.length; q++) {
+          var z = gates[q].zone;
+          if (t[0] >= z[0] && t[0] <= z[2] && t[1] >= z[1] && t[1] <= z[3]) { e.gate = q; break; }
+        }
+      }
       if (e.kind === 'item') totalItems++;
     });
 
@@ -375,7 +398,7 @@
     for (var n = 0; n < this.entities.length; n++) {
       var e = this.entities[n];
       if (many ? ignore.indexOf(e) >= 0 : e === ignore) continue;
-      var shootable = (e.kind === 'enemy' && e.state !== 'die' && e.state !== 'dead') ||
+      var shootable = (e.kind === 'enemy' && e.state !== 'die' && e.state !== 'dead' && e.state !== 'exec') ||
                       (e.kind === 'decor' && (e.explosive || e.solid));
       if (!shootable) continue;
       var ex = e.x - x, ey = e.y - y;
@@ -489,7 +512,15 @@
       var i = ty * w.w + tx;
       if (w.type[i] === 2) { this.openDoor(i, true); return; }
       if (w.type[i] === 1) {
-        if (i === w.exitTile) { this.exitLevel(); return; }
+        if (i === w.exitTile) {
+          if (w.exitNeedsBoss && !this.bossDead) {
+            this.message('THE CORE IS STILL BREATHING.');
+            Sound.play('noammo', 0.8);
+            return;
+          }
+          this.exitLevel();
+          return;
+        }
         return;                                        /* solid wall blocks the reach */
       }
     }
@@ -498,6 +529,16 @@
 
   Game.openDoor = function (i, byPlayer) {
     var w = this.world, p = this.player;
+    if (w.dgate[i] >= 0) {
+      var gt = w.gates[w.dgate[i]];
+      if (!gt.cleared) {
+        if (byPlayer) {
+          this.message('SEALED - ' + gt.live + ' LEFT IN THIS ROOM');
+          Sound.play('noammo', 0.8);
+        }
+        return;
+      }
+    }
     if (w.dstate[i] === 1 || w.dstate[i] === 2) { w.dtimer[i] = 4.0; return; }
     var key = w.dkey[i];
     if (key && !p.keys[key]) {
@@ -524,7 +565,7 @@
     var ty = (e.y + Math.sin(e.moveDir) * (e.radius + 0.35)) | 0;
     if (tx < 0 || ty < 0 || tx >= w.w || ty >= w.h) return;
     var i = ty * w.w + tx;
-    if (w.type[i] === 2 && !w.dkey[i] && !w.dsecret[i] && w.dstate[i] === 0) this.openDoor(i, false);
+    if (w.type[i] === 2 && !w.dkey[i] && !w.dsecret[i] && w.dgate[i] < 0 && w.dstate[i] === 0) this.openDoor(i, false);
   };
 
   Game.updateDoors = function (dt) {
@@ -550,6 +591,72 @@
         if (w.dopen[i] <= 0) { w.dopen[i] = 0; w.dstate[i] = 0; }
       }
     }
+  };
+
+  /* ==========================================================================
+   * Arena gates.
+   *
+   * Walk in and the way forward seals behind a red door. It opens the moment
+   * the room is dead — which is also the moment your clock is fullest, so the
+   * pacing of the level and the pacing of the resource line up.
+   * ========================================================================== */
+  Game.updateGates = function () {
+    var w = this.world, p = this.player;
+    if (!w.gates) return;
+    for (var i = 0; i < w.gates.length; i++) {
+      var gt = w.gates[i];
+      if (gt.cleared) continue;
+
+      var live = 0;
+      for (var e = 0; e < this.entities.length; e++) {
+        var en = this.entities[e];
+        if (en.kind === 'enemy' && en.gate === i && en.state !== 'die' && en.state !== 'dead' && en.state !== 'exec') live++;
+      }
+      gt.live = live;
+
+      if (!gt.armed) {
+        var z = gt.zone;
+        if (p.x >= z[0] && p.x <= z[2] + 1 && p.y >= z[1] && p.y <= z[3] + 1) {
+          gt.armed = true;
+          if (live > 0) {
+            this.sound('doorclose', (gt.tile % w.w) + 0.5, ((gt.tile / w.w) | 0) + 0.5, 0.9);
+            this.popup('SEALED', P.RED, P.RED_N);
+            /* everything in the room notices you at once */
+            for (var k = 0; k < this.entities.length; k++) {
+              var m = this.entities[k];
+              if (m.kind === 'enemy' && m.gate === i && m.state === 'idle') {
+                m.state = 'chase'; m.stateTime = 0; m.target = p; m.alerted = true;
+              }
+            }
+            Sound.play('sight', 0.5, 0, 0.8);
+          }
+        }
+      }
+
+      if (gt.armed && live === 0) {
+        gt.cleared = true;
+        for (var t = 0; t < gt.tiles.length; t++) {
+          w.dstate[gt.tiles[t]] = 1;
+          w.dtimer[gt.tiles[t]] = 1e9;           /* stays open for good */
+        }
+        this.popup('WAY CLEAR', P.CYAN, P.CYAN_N);
+        Sound.play('secret', 0.85);
+        this.addTime(TIME.roomClear, 'ROOM CLEAR');
+      }
+    }
+  };
+
+  /* The arena the player is standing in, if it is still holding them. */
+  Game.activeGate = function () {
+    var w = this.world, p = this.player;
+    if (!w.gates) return null;
+    for (var i = 0; i < w.gates.length; i++) {
+      var gt = w.gates[i];
+      if (!gt.armed || gt.cleared) continue;
+      var z = gt.zone;
+      if (p.x >= z[0] - 1 && p.x <= z[2] + 2 && p.y >= z[1] - 1 && p.y <= z[3] + 2) return gt;
+    }
+    return null;
   };
 
   Game.tileOccupied = function (tx, ty) {
@@ -983,7 +1090,7 @@
       p.vy += (wishY - p.vy) * Math.min(1, accel * dt);
     }
 
-    var r = 0.26;
+    var r = 0.22;
     var nx = p.x + p.vx * dt, ny = p.y + p.vy * dt;
     if (this.canMove(nx, p.y, r, p)) p.x = nx; else { p.vx *= 0.2; if (p.dashTime > 0) p.dashVX *= 0.2; }
     if (this.canMove(p.x, ny, r, p)) p.y = ny; else { p.vy *= 0.2; if (p.dashTime > 0) p.dashVY *= 0.2; }
@@ -1252,6 +1359,7 @@
     this.stats.time += raw;
     this.updatePlayer(playerDt);
     this.updateWeapon(weaponDt);
+    this.updateGates();
     this.updateDoors(worldDt);
     Ent.update(this, worldDt);
 
