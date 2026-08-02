@@ -1328,16 +1328,19 @@
     if (p.dead) return;
     var w = WEAPONS[p.weapon];
     var pic = w.frames[p.weaponStep] || w.frames[0];
+    /* Drawn oversized and anchored past the bottom edge: a first person weapon
+       should feel like it is a foot from your face, not sitting on a shelf. */
+    var scale = 1.18;
     var bobX = Math.sin(p.bobTime) * 7;
     var bobY = Math.abs(Math.cos(p.bobTime)) * 5;
-    var x = (r.W - pic.w) / 2 + bobX;
-    var y = r.viewH - pic.h + bobY + p.raise * 140;
+    var x = (r.W - pic.w * scale) / 2 + bobX;
+    var y = r.viewH - pic.h * scale + bobY + p.raise * 150;
 
     /* the gun is lit by the room, and by its own muzzle flash */
     var light = this.world.ambient + 1;
     if (this.cam.flash > 0) light -= this.cam.flash;
     light = Math.max(0, Math.min(28, light));
-    r.blit(pic, x, y, light, 1, false);
+    r.blit(pic, x, y, light, scale, false);
   };
 
   /* Scanlines + vignette. Cheap, and it sells the CRT look. */

@@ -118,9 +118,14 @@ Three sectors, ending in the Core.
   nearest-colour search
 - An indexed-bitmap drawing DSL (shaded ellipses, capsule limbs, tapered tubes,
   scanline polygons)
-- First-person weapons built as foreshortened tubes with the hands running off
-  the bottom edge — they sit below the sightline and stop short of the horizon,
-  which is what makes a gun read as *held* rather than as scenery
+- First-person weapons built from a one-point-perspective box primitive rather
+  than tapered tubes. A tube gives you a smooth cone; a gun needs flat planes
+  with hard edges between them, so you read the top deck and one flank as
+  separate surfaces. Each weapon is then assembled from several of those boxes
+  at different heights — receiver, barrel stepping in above it, magazine slung
+  below, grip dropping away — because the stepped, asymmetric silhouette is
+  what actually says "firearm". They sit right of centre and recede toward the
+  crosshair so a flank stays visible, and the hands run off the bottom edge
 - Enemies drawn in three views and mirrored at render time, giving eight
   rotations — they visibly turn as they circle you
 - A dedicated six-frame execution sequence per enemy, tinted to its own palette
@@ -157,7 +162,8 @@ Three sectors, ending in the Core.
 **HUD** — `src/hud.js`
 - The countdown sits dead centre bottom, because it is the only number that
   matters; the screen itself reddens and pulses under 15 seconds and the
-  soundtrack tightens with it
+  soundtrack tightens with it. Readouts sit on a darkened scrim so they never
+  vanish into the weapon or a bright floor behind them
 - Corner readouts over a full-screen view: shield, dash charges, weapon and
   reserve, kill-chain rank
 - A bitmap font drawn from bit patterns, and a revealed-as-you-explore automap

@@ -834,6 +834,41 @@
     b.line(x - rad * 0.78, y + rad * 0.30, x + rad * 0.78, y + rad * 0.30, sh(B, BN, 0.10));
   }
 
+  /* A rectangular box in one point perspective — the primitive that actually
+     makes a weapon read as a weapon. Each face is flat shaded with a hard edge
+     against its neighbours, because a gun is machined, not moulded: you should
+     be able to see the top deck and one flank as separate planes. `n` is the
+     near face (bigger, toward you), `f` the far face. */
+  function frustum(b, n, f, rs, rn, t, noTop) {
+    var nl = n.x - n.w, nr = n.x + n.w, nt = n.y - n.h, nb = n.y + n.h;
+    var fl = f.x - f.w, fr = f.x + f.w, ft = f.y - f.h, fb = f.y + f.h;
+    var edge = sh(P.GRAY, P.GRAY_N, 0.03);
+    /* Proportional rather than subtractive, so a dark base material still
+       shows all five planes instead of collapsing into a black hole. */
+    poly(b, [[fl, fb], [fr, fb], [nr, nb], [nl, nb]], sh(rs, rn, Math.max(0.05, t * 0.42)));
+    poly(b, [[fr, ft], [fr, fb], [nr, nb], [nr, nt]], sh(rs, rn, Math.max(0.08, t * 0.62)));
+    poly(b, [[fl, ft], [fl, fb], [nl, nb], [nl, nt]], sh(rs, rn, Math.min(1, t + 0.12)));
+    poly(b, [[fl, ft], [fr, ft], [fr, fb], [fl, fb]], sh(rs, rn, Math.max(0.06, t * 0.82)));
+    if (!noTop) poly(b, [[fl, ft], [fr, ft], [nr, nt], [nl, nt]], sh(rs, rn, Math.min(1, t + 0.28)));
+    /* hard silhouette and plane boundaries */
+    b.line(fl, ft, fr, ft, edge); b.line(fl, fb, fr, fb, edge);
+    b.line(fl, ft, nl, nt, edge); b.line(fr, ft, nr, nt, edge);
+    b.line(fl, fb, nl, nb, edge); b.line(fr, fb, nr, nb, edge);
+    return { nl: nl, nr: nr, nt: nt, nb: nb, fl: fl, fr: fr, ft: ft, fb: fb };
+  }
+
+  /* Panel laid onto a box's top deck — vents, windows, rails. */
+  function deckPanel(b, box, t0, t1, frac, c) {
+    function lerp(a, z, k) { return a + (z - a) * k; }
+    function span(k) {
+      var l = lerp(box.nl, box.fl, k), r = lerp(box.nr, box.fr, k);
+      var mid = (l + r) / 2, half = (r - l) / 2 * (1 - frac);
+      return [mid - half, mid + half, lerp(box.nt, box.ft, k)];
+    }
+    var a = span(t0), z = span(t1);
+    poly(b, [[z[0], z[2]], [z[1], z[2]], [a[1], a[2]], [a[0], a[2]]], c);
+  }
+
   function muzzleFlash(b, x, y, size, rs, rn) {
     rs = rs || P.FIRE; rn = rn || P.FIRE_N;
     for (var i = 0; i < 9; i++) {
@@ -850,31 +885,44 @@
   function pistolSpr(k) {
     var b = new PixBuf(WW, WH);
     var kick = k === 1 ? 7 : (k === 2 ? 3 : 0);
-    var slide = k === 1 ? 7 : (k === 2 ? 3 : 0);
+    var slide = k === 1 ? 6 : (k === 2 ? 2 : 0);
     var G = P.GRAY, GN = P.GRAY_N;
 
-    tube(b, 190, 104 + kick, 22, 184, 78 + kick, 17, G, GN, 0.19);
-    for (var g = 0; g < 4; g++)
-      b.line(167, 84 + g * 6 + kick, 205, 85 + g * 6 + kick, sh(G, GN, 0.08));
-    b.frame(166, 76 + kick, 22, 15, sh(G, GN, 0.26));
+    /* grip dropping away from the frame, toward the hand */
+    frustum(b, { x: 196, y: 104 + kick, w: 13, h: 10 }, { x: 188, y: 78 + kick, w: 11, h: 8 }, G, GN, 0.17);
+    for (var g = 0; g < 5; g++)
+      b.line(178, 84 + g * 4 + kick, 206, 86 + g * 4 + kick, sh(G, GN, 0.07));
 
-    tube(b, 185, 80 + kick, 24, 177, 50 + kick + slide, 18, G, GN, 0.31);
-    b.rect(190, 58 + kick, 8, 14, sh(G, GN, 0.06));
-    for (var i2 = 0; i2 < 6; i2++)
-      b.line(192, 62 + i2 * 4 + kick, 200, 63 + i2 * 4 + kick, sh(G, GN, 0.11));
+    /* frame and slide: the chunky part you see the flank of */
+    var fr = frustum(b, { x: 188, y: 82 + kick, w: 16, h: 12 },
+                        { x: 168, y: 48 + kick + slide, w: 10, h: 8 }, G, GN, 0.29);
+    deckPanel(b, fr, 0.15, 0.85, 0.45, sh(G, GN, 0.44));            /* slide rib */
+    b.rect(194, 62 + kick, 9, 7, sh(G, GN, 0.05));               /* ejection port */
+    b.line(194, 62 + kick, 203, 62 + kick, sh(G, GN, 0.42));
+    for (var s = 0; s < 5; s++)
+      b.line(196 + s * 2, 72 + kick, 198 + s * 2, 80 + kick, sh(G, GN, 0.10));
 
-    tube(b, 177, 52 + kick + slide, 15, 174, 40 + kick, 12, G, GN, 0.25);
-    bore(b, 174, 40 + kick, 12, 5, G, GN);
-    b.rect(171, 32 + kick, 5, 8, sh(G, GN, 0.47));
-    b.rect(181, 48 + kick + slide, 8, 3, sh(G, GN, 0.44));
+    /* barrel steps down off the frame — the silhouette break that says "gun" */
+    frustum(b, { x: 168, y: 50 + kick + slide, w: 7, h: 6 },
+               { x: 164, y: 36 + kick, w: 5, h: 4.5 }, G, GN, 0.24);
+    b.ellipse(164, 36 + kick, 5, 4.5, sh(G, GN, 0.10));
+    b.ellipse(164, 36 + kick, 3, 2.8, sh(G, GN, 0.02));
 
-    weaponHand(b, 163, 97 + kick, 1, 18);
-    weaponHand(b, 203, 91 + kick, -1, 19);
+    b.rect(162, 29 + kick, 4, 7, sh(G, GN, 0.50));               /* front sight */
+    b.rect(182, 66 + kick + slide, 9, 4, sh(G, GN, 0.46));       /* rear sight */
+    b.rect(184, 67 + kick + slide, 2, 2, sh(G, GN, 0.03));
+    b.rect(188, 67 + kick + slide, 2, 2, sh(G, GN, 0.03));
 
-    if (k === 1) muzzleFlash(b, 174, 30, 30);
+    /* trigger guard hanging under the frame */
+    b.thickLine(180, 92 + kick, 192, 94 + kick, 2, sh(G, GN, 0.22));
+
+    weaponHand(b, 176, 100 + kick, 1, 17);
+    weaponHand(b, 208, 94 + kick, -1, 18);
+
+    if (k === 1) muzzleFlash(b, 164, 26, 28);
     else if (k === 2) {
-      b.rect(206, 54, 9, 5, sh(P.GOLD, P.GOLD_N, 0.76));
-      b.rect(211, 54, 4, 3, sh(P.GOLD, P.GOLD_N, 0.98));
+      b.rect(210, 56, 9, 5, sh(P.GOLD, P.GOLD_N, 0.78));
+      b.rect(215, 56, 4, 3, sh(P.GOLD, P.GOLD_N, 0.98));
     }
     return finish(b);
   }
@@ -883,35 +931,45 @@
   function shotgunSpr(k) {
     var b = new PixBuf(WW, WH);
     var kick = [0, 9, 5, 2, 0][k];
-    var slid = [0, 0, 0.62, 0.95, 0.34][k];              /* pump travel 0..1 */
+    var slid = [0, 0, 0.60, 0.95, 0.32][k];
     var G = P.GRAY, GN = P.GRAY_N, Wd = P.BROWN, WdN = P.BROWN_N;
 
-    tube(b, 170, 104 + kick, 50, 165, 68 + kick, 37, G, GN, 0.25);
-    b.line(130, 74 + kick, 122, 100 + kick, sh(G, GN, 0.40));
-    b.line(201, 74 + kick, 212, 100 + kick, sh(G, GN, 0.09));
-    b.rect(140, 80 + kick, 52, 5, sh(G, GN, 0.10));
-    b.rect(146, 88 + kick, 40, 3, sh(G, GN, 0.34));
+    /* stock running back past the hand */
+    frustum(b, { x: 196, y: 104 + kick, w: 20, h: 13 }, { x: 182, y: 82 + kick, w: 17, h: 12 }, Wd, WdN, 0.24);
 
-    tube(b, 176, 72 + kick, 13, 167, 44 + kick, 9, G, GN, 0.16);     /* magazine tube */
-    tube(b, 165, 70 + kick, 18, 160, 32 + kick, 13, G, GN, 0.33);    /* barrel */
-    bore(b, 160, 32 + kick, 13, 5, G, GN);
-    b.rect(158, 24 + kick, 4, 7, sh(G, GN, 0.58));
+    /* receiver: the widest box, the anchor of the silhouette */
+    var rc = frustum(b, { x: 182, y: 86 + kick, w: 25, h: 16 },
+                        { x: 162, y: 62 + kick, w: 17, h: 12 }, G, GN, 0.26);
+    deckPanel(b, rc, 0.10, 0.55, 0.40, sh(G, GN, 0.10));            /* loading port */
+    b.rect(186, 74 + kick, 11, 6, sh(G, GN, 0.04));              /* ejection port */
+    b.line(186, 74 + kick, 197, 74 + kick, sh(G, GN, 0.40));
 
-    /* Pump grip rides the magazine tube between two keyframed positions. */
-    var px0 = 174, py0 = 92, pw0 = 24, px1 = 168, py1 = 58, pw1 = 16;
-    var cx = px0 + (px1 - px0) * slid, cy = py0 + (py1 - py0) * slid, cw = pw0 + (pw1 - pw0) * slid;
-    tube(b, cx + 1, cy + 12 + kick, cw + 1, cx - 1, cy - 10 + kick, cw - 2, Wd, WdN, 0.35);
-    for (var i = 0; i < 7; i++)
-      b.line(cx - cw + 4 + i * (cw * 0.30), cy - 9 + kick, cx - cw + 2 + i * (cw * 0.30), cy + 11 + kick, sh(Wd, WdN, 0.13));
+    /* magazine tube slung under the barrel */
+    frustum(b, { x: 172, y: 78 + kick, w: 7, h: 6 }, { x: 160, y: 44 + kick, w: 5, h: 4 }, G, GN, 0.14);
 
-    weaponHand(b, cx - cw - 13, cy + 17 + kick, 1, 18);
-    weaponHand(b, 214, 94 + kick, -1, 19);
+    /* barrel sits high on the receiver and steps well in — the shotgun read */
+    frustum(b, { x: 170, y: 66 + kick, w: 8.5, h: 7 }, { x: 158, y: 28 + kick, w: 5.5, h: 4.5 }, G, GN, 0.32);
+    b.ellipse(158, 28 + kick, 5.5, 4.5, sh(G, GN, 0.09));
+    b.ellipse(158, 28 + kick, 3.4, 2.8, sh(G, GN, 0.02));
+    b.rect(156, 22 + kick, 3, 6, sh(G, GN, 0.58));               /* bead */
+
+    /* pump grip riding the tube */
+    var px = 172 + (160 - 172) * slid, py = 78 + (46 - 78) * slid;
+    var pw = 10 + (7 - 10) * slid, ph = 8 + (6 - 8) * slid;
+    frustum(b, { x: px + 2, y: py + 9 + kick, w: pw + 1, h: ph },
+               { x: px - 2, y: py - 9 + kick, w: pw - 1, h: ph - 1 }, Wd, WdN, 0.33);
+    for (var i = 0; i < 5; i++)
+      b.line(px - pw + 2 + i * (pw * 0.42), py - 8 + kick, px - pw + i * (pw * 0.42), py + 8 + kick,
+        sh(Wd, WdN, 0.12));
+
+    weaponHand(b, px - pw - 12, py + 14 + kick, 1, 17);
+    weaponHand(b, 214, 98 + kick, -1, 18);
 
     if (k === 3) {
-      b.rect(222, 48, 10, 5, sh(P.RED, P.RED_N, 0.72));
-      b.rect(229, 48, 3, 5, sh(P.GOLD, P.GOLD_N, 0.92));
+      b.rect(200, 56, 10, 5, sh(P.RED, P.RED_N, 0.74));
+      b.rect(207, 56, 3, 5, sh(P.GOLD, P.GOLD_N, 0.92));
     }
-    if (k === 1) muzzleFlash(b, 160, 24, 38);
+    if (k === 1) muzzleFlash(b, 158, 20, 36);
     return finish(b);
   }
 
@@ -921,35 +979,41 @@
     var spin = k * 1.047, kick = (k === 1 || k === 3) ? 4 : 0;
     var G = P.GRAY, GN = P.GRAY_N;
 
-    for (var i = 0; i < 7; i++) {                                   /* ammo belt */
-      var lx = 96 - i * 9, ly = 80 + i * 6;
+    for (var i = 0; i < 7; i++) {                                 /* ammo belt */
+      var lx = 100 - i * 9, ly = 78 + i * 6;
       b.rect(lx, ly, 12, 8, sh(P.GOLD, P.GOLD_N, 0.70 - i * 0.05));
       b.rect(lx + 1, ly, 10, 2, sh(P.GOLD, P.GOLD_N, 0.94));
+      b.line(lx, ly + 8, lx + 12, ly + 8, sh(P.GRAY, P.GRAY_N, 0.04));
     }
-    tube(b, 160, 104 + kick, 58, 160, 66 + kick, 42, G, GN, 0.20);
-    b.rect(144, 72 + kick, 32, 30, sh(G, GN, 0.07));
-    b.rect(148, 76 + kick, 24, 6, sh(P.RED, P.RED_N, 0.55));
 
-    /* Rotor disc goes down first so the barrels stand proud of it, then the
-       barrels back-to-front, then the muzzle plate over their tips. */
-    b.ellipse(160, 67 + kick, 42, 14, sh(G, GN, 0.22));
-    b.ellipse(160, 67 + kick, 18, 8, sh(G, GN, 0.07));
+    /* housing */
+    var hs = frustum(b, { x: 176, y: 104 + kick, w: 40, h: 26 },
+                        { x: 158, y: 60 + kick, w: 26, h: 17 }, G, GN, 0.21);
+    deckPanel(b, hs, 0.12, 0.62, 0.30, sh(G, GN, 0.12));
+    for (var v = 0; v < 4; v++)                                   /* heat vents */
+      deckPanel(b, hs, 0.18 + v * 0.10, 0.24 + v * 0.10, 0.52, sh(P.RED, P.RED_N, 0.34));
+    b.rect(192, 78 + kick, 17, 10, sh(G, GN, 0.06));              /* feed block */
+
+    /* rotor face, then the barrels standing proud of it */
+    b.ellipse(158, 58 + kick, 25, 12, sh(G, GN, 0.22));
+    b.ellipse(158, 58 + kick, 10, 5, sh(G, GN, 0.05));
     var order = [];
     for (var bl = 0; bl < 6; bl++) order.push(bl);
     order.sort(function (a, c) { return Math.cos(spin + a * 1.047) - Math.cos(spin + c * 1.047); });
     for (var n = 0; n < 6; n++) {
       var a2 = spin + order[n] * 1.047;
       var off = Math.sin(a2), dep = Math.cos(a2);
-      tube(b, 160 + off * 28, 68 + kick + dep * 6, 9,
-              160 + off * 15, 34 + kick + dep * 4, 6, G, GN, 0.10 + (dep + 1) * 0.23);
-      b.ellipse(160 + off * 15, 34 + kick + dep * 4, 6, 2.6, sh(G, GN, 0.04));
+      var t = 0.12 + (dep + 1) * 0.20;
+      frustum(b, { x: 158 + off * 18, y: 58 + kick + dep * 5, w: 5.5, h: 4.5 },
+                 { x: 157 + off * 11, y: 30 + kick + dep * 3, w: 4, h: 3.2 }, G, GN, t, true);
+      b.ellipse(157 + off * 11, 30 + kick + dep * 3, 4, 3.2, sh(G, GN, 0.05));
     }
-    b.ellipse(160, 34 + kick, 18, 6, sh(G, GN, 0.30));
-    b.ellipse(160, 34 + kick, 13, 4, sh(G, GN, 0.13));
+    b.ellipse(157, 30 + kick, 15, 6, sh(G, GN, 0.26));
+    b.ellipse(157, 30 + kick, 11, 4, sh(G, GN, 0.08));
 
-    weaponHand(b, 104, 96, 1, 19);
-    weaponHand(b, 216, 96, -1, 19);
-    if (k === 1 || k === 3) muzzleFlash(b, 160, 26, 34);
+    weaponHand(b, 108, 96, 1, 18);
+    weaponHand(b, 216, 98, -1, 18);
+    if (k === 1 || k === 3) muzzleFlash(b, 157, 22, 32);
     return finish(b);
   }
 
@@ -957,29 +1021,32 @@
   function plasmaSpr(k) {
     var b = new PixBuf(WW, WH);
     var kick = k === 1 ? 5 : 0, G = P.GRAY, GN = P.GRAY_N;
-    var glow = k === 1 ? 1.0 : (k === 2 ? 0.78 : 0.60);
+    var glow = k === 1 ? 1.0 : (k === 2 ? 0.78 : 0.58);
 
-    tube(b, 160, 104 + kick, 54, 160, 58 + kick, 36, G, GN, 0.22);
-    tube(b, 160, 96 + kick, 28, 160, 64 + kick, 19, G, GN, 0.05);
-    tube(b, 160, 93 + kick, 25, 160, 67 + kick, 16, P.CYAN, P.CYAN_N, glow * 0.70);
-    for (var i = 0; i < 5; i++) {
-      var t = i / 4;
-      b.line(137 + t * 46, 92 + kick, 145 + t * 30, 68 + kick,
-        sh(P.CYAN, P.CYAN_N, Math.min(1, glow + 0.16)));
-    }
-    tube(b, 160, 62 + kick, 34, 160, 38 + kick, 23, G, GN, 0.17);
+    /* receiver with the reactor window let into the top deck */
+    var bd = frustum(b, { x: 176, y: 104 + kick, w: 37, h: 23 },
+                        { x: 158, y: 56 + kick, w: 23, h: 15 }, G, GN, 0.23);
+    deckPanel(b, bd, 0.08, 0.74, 0.26, sh(G, GN, 0.11));
+    deckPanel(b, bd, 0.13, 0.70, 0.36, sh(P.CYAN, P.CYAN_N, glow * 0.80));
+    for (var i = 0; i < 4; i++)
+      deckPanel(b, bd, 0.18 + i * 0.13, 0.215 + i * 0.13, 0.30, sh(P.CYAN, P.CYAN_N, Math.min(1, glow + 0.25)));
+    b.rect(196, 76 + kick, 13, 9, sh(G, GN, 0.07));               /* cell latch */
+
+    /* emitter block steps in, prongs splay off it */
+    frustum(b, { x: 162, y: 58 + kick, w: 21, h: 14 }, { x: 157, y: 36 + kick, w: 13, h: 10 }, G, GN, 0.18);
     for (var s = -1; s <= 1; s += 2) {
-      tube(b, 160 + s * 18, 40 + kick, 7, 160 + s * 28, 26 + kick, 5, G, GN, 0.28);
-      b.ellipse(160 + s * 28, 26 + kick, 5.6, 4.4, sh(P.CYAN, P.CYAN_N, glow));
+      frustum(b, { x: 157 + s * 12, y: 38 + kick, w: 4.5, h: 4 },
+                 { x: 157 + s * 21, y: 24 + kick, w: 3, h: 2.8 }, G, GN, 0.29, true);
+      b.ellipse(157 + s * 21, 24 + kick, 4, 3.4, sh(P.CYAN, P.CYAN_N, glow));
     }
-    b.ellipse(160, 36 + kick, 14, 7, sh(P.CYAN, P.CYAN_N, glow * 0.52));
-    b.ellipse(160, 36 + kick, 7, 4, sh(P.CYAN, P.CYAN_N, Math.min(1, glow + 0.2)));
+    b.ellipse(157, 34 + kick, 11, 5, sh(P.CYAN, P.CYAN_N, glow * 0.5));
+    b.ellipse(157, 34 + kick, 6, 3, sh(P.CYAN, P.CYAN_N, Math.min(1, glow + 0.25)));
 
-    weaponHand(b, 100, 96, 1, 19);
-    weaponHand(b, 220, 96, -1, 19);
+    weaponHand(b, 104, 96, 1, 18);
+    weaponHand(b, 220, 98, -1, 18);
     if (k === 1) {
-      b.ellipse(160, 26, 24, 16, sh(P.CYAN, P.CYAN_N, 0.30));
-      muzzleFlash(b, 160, 26, 30, P.CYAN, P.CYAN_N);
+      b.ellipse(157, 24, 20, 14, sh(P.CYAN, P.CYAN_N, 0.30));
+      muzzleFlash(b, 157, 24, 26, P.CYAN, P.CYAN_N);
     }
     return finish(b);
   }
@@ -990,26 +1057,34 @@
     var kick = k === 1 ? 8 : (k === 2 ? 3 : 0);
     var G = P.GRAY, GN = P.GRAY_N, Gr = P.GREEN, GrN = P.GREEN_N;
 
-    tube(b, 164, 104 + kick, 52, 159, 42 + kick, 35, Gr, GrN, 0.23);
-    b.line(126, 48 + kick, 114, 100 + kick, sh(Gr, GrN, 0.40));
-    b.line(193, 48 + kick, 208, 100 + kick, sh(Gr, GrN, 0.08));
-    bore(b, 159, 42 + kick, 35, 12, G, GN);
-    if (k !== 1) b.ellipse(159, 42 + kick, 12, 5, sh(P.RED, P.RED_N, 0.60));
+    /* launch tube: a heavy square-shouldered box, not a cone */
+    var tb = frustum(b, { x: 178, y: 104 + kick, w: 37, h: 24 },
+                        { x: 157, y: 40 + kick, w: 24, h: 17 }, Gr, GrN, 0.24);
+    deckPanel(b, tb, 0.30, 0.42, 0.16, sh(P.GOLD, P.GOLD_N, 0.78));  /* warning bands */
+    deckPanel(b, tb, 0.50, 0.58, 0.16, sh(P.GRAY, P.GRAY_N, 0.05));
 
-    tube(b, 160, 74 + kick, 10, 158, 46 + kick, 8, G, GN, 0.30);
-    b.rect(155, 37 + kick, 5, 9, sh(G, GN, 0.44));
-    poly(b, [[114, 64 + kick], [136, 60 + kick], [140, 90], [110, 96]], sh(G, GN, 0.22));
-    b.rect(117, 70 + kick, 16, 11, sh(P.RED, P.RED_N, 0.60));
-    b.rect(120, 72 + kick, 9, 7, sh(P.FIRE, P.FIRE_N, 0.92));
-    b.line(124, 86 + kick, 198, 86 + kick, sh(P.GOLD, P.GOLD_N, 0.80));
-    b.line(122, 92 + kick, 200, 92 + kick, sh(P.GRAY, P.GRAY_N, 0.04));
+    /* the bore, cut deep into the far cap */
+    b.ellipse(157, 40 + kick, 19, 12.5, sh(G, GN, 0.18));
+    b.ellipse(157, 40 + kick, 15, 9.5, sh(G, GN, 0.07));
+    b.ellipse(157, 40 + kick, 10, 6, sh(P.GRAY, P.GRAY_N, 0.03));
+    if (k !== 1) {
+      b.ellipse(157, 40 + kick, 6, 4, sh(P.RED, P.RED_N, 0.58));  /* loaded warhead */
+      b.ellipse(156, 39 + kick, 2.4, 1.8, sh(P.RED, P.RED_N, 0.86));
+    }
 
-    weaponHand(b, 98, 98, 1, 19);
-    weaponHand(b, 222, 98, -1, 19);
+    /* blade sight clear of the muzzle, and a boxy optic off the shoulder */
+    b.rect(155, 20 + kick, 4, 9, sh(G, GN, 0.48));
+    b.rect(153, 27 + kick, 8, 3, sh(G, GN, 0.34));
+    frustum(b, { x: 140, y: 96 + kick, w: 13, h: 10 }, { x: 143, y: 66 + kick, w: 9, h: 7 }, G, GN, 0.24);
+    b.rect(137, 72 + kick, 13, 9, sh(P.RED, P.RED_N, 0.62));
+    b.rect(140, 74 + kick, 7, 5, sh(P.FIRE, P.FIRE_N, 0.94));
+
+    weaponHand(b, 102, 98, 1, 18);
+    weaponHand(b, 222, 100, -1, 18);
     if (k === 1) {
-      muzzleFlash(b, 159, 32, 44);
+      muzzleFlash(b, 157, 30, 40);
       for (var n = 0; n < 12; n++)
-        b.ellipse(110 + (n * 21) % 100, 100 - (n * 13) % 20, 3 + n % 3, 2 + n % 2, sh(P.GRAY, P.GRAY_N, 0.19));
+        b.ellipse(114 + (n * 21) % 96, 100 - (n * 13) % 20, 3 + n % 3, 2 + n % 2, sh(P.GRAY, P.GRAY_N, 0.19));
     }
     return finish(b);
   }

@@ -164,16 +164,20 @@
 
     var clockTxt = fmtClock(p.clock);
     var cw2 = clockTxt.length * 18;
-    drawBig(r, clockTxt, (W >> 1) + cw2 / 2, H - 34, cRamp, cRampN);
-    drawTextCentre(r, 'SECONDS', W / 2, H - 12, sh(cRamp, cRampN, 0.45 + beat * 0.25), 1);
+    /* scrim first, so the one number that matters never disappears into the
+       weapon or a bright floor behind it */
+    r.shadeRect((W >> 1) - cw2 / 2 - 7, H - 41, cw2 + 14, 38, 0.55);
+    drawBig(r, clockTxt, (W >> 1) + cw2 / 2, H - 38, cRamp, cRampN);
+    drawTextCentre(r, 'SECONDS', W / 2, H - 16, sh(cRamp, cRampN, 0.45 + beat * 0.25), 1);
     var bw = 104;
-    meter(r, (W - bw) >> 1, H - 4, bw, 3, Math.min(1, p.clock / 90), cRamp, cRampN, 6);
+    meter(r, (W - bw) >> 1, H - 7, bw, 3, Math.min(1, p.clock / 90), cRamp, cRampN, 6);
 
     /* time just gained flashes above the clock */
     if (game.timeFlash > 0)
-      drawTextCentre(r, '+TIME', W / 2, H - 44, sh(P.CYAN, P.CYAN_N, Math.min(1, game.timeFlash)), 1);
+      drawTextCentre(r, '+TIME', W / 2, H - 48, sh(P.CYAN, P.CYAN_N, Math.min(1, game.timeFlash)), 1);
 
     /* ---- bottom left: shield and dash ---- */
+    r.shadeRect(0, H - 40, 74, 40, 0.45);
     if (p.shield > 0) {
       drawText(r, 'SHIELD', 6, H - 34, dim, 1);
       meter(r, 6, H - 25, 52, 4, Math.min(1, p.shield / 100), P.BLUE, P.BLUE_N, 5);
@@ -190,6 +194,7 @@
     /* ---- bottom right: weapon and ammo ---- */
     var ammoTxt = base.ammo ? String(p.ammo[base.ammo]) : '--';
     var lowAmmo = base.ammo && p.ammo[base.ammo] <= 5;
+    r.shadeRect(W - 106, H - 46, 106, 46, 0.45);
     drawBig(r, ammoTxt, W - 6, H - 34, lowAmmo ? P.RED : P.GOLD, lowAmmo ? P.RED_N : P.GOLD_N);
     drawText(r, base.name, W - 6 - textWidth(base.name, 1), H - 8, sh(P.STONE, P.STONE_N, 0.80), 1);
     if (base.alt) {

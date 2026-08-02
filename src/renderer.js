@@ -387,6 +387,21 @@
     }
   };
 
+  /* Darken a rectangle in place — a scrim so HUD readouts stay legible over
+     whatever the world happens to put behind them. */
+  Renderer.prototype.shadeRect = function (x, y, w, h, k) {
+    var W = this.W, buf8 = this.buf8;
+    var x0 = Math.max(0, x | 0), y0 = Math.max(0, y | 0);
+    var x1 = Math.min(W, (x + w) | 0), y1 = Math.min(this.H, (y + h) | 0);
+    var f = 1 - Math.max(0, Math.min(1, k));
+    for (var j = y0; j < y1; j++) {
+      var p = (j * W + x0) * 4;
+      for (var i = x0; i < x1; i++, p += 4) {
+        buf8[p] *= f; buf8[p + 1] *= f; buf8[p + 2] *= f;
+      }
+    }
+  };
+
   /* Whole screen tint, applied after everything else. */
   Renderer.prototype.tint = function (r, g, b, amount, fromY, toY) {
     if (amount <= 0) return;
